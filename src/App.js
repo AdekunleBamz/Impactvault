@@ -11,6 +11,18 @@ const CONFIG = {
   EXPLORER: "https://celoscan.io"
 };
 
+// Mobile detection
+const isMobile = () => {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+};
+
+// Connect MetaMask Mobile via Deep Link
+const connectMetaMaskMobile = () => {
+  const dappUrl = window.location.href.replace(/^https?:\/\//, '');
+  const metamaskAppDeepLink = `https://metamask.app.link/dapp/${dappUrl}`;
+  window.location.href = metamaskAppDeepLink;
+};
+
 const ImpactVault = () => {
   const [connected, setConnected] = useState(false);
   const [address, setAddress] = useState('');
@@ -24,13 +36,71 @@ const ImpactVault = () => {
   const [error, setError] = useState('');
   const [txHash, setTxHash] = useState('');
   const [showWalletModal, setShowWalletModal] = useState(false);
-
   const connectMetaMask = async () => {
     setError('');
     setLoading(true);
     setShowWalletModal(false);
+  
     try {
-      if (!window.ethereum) throw new Error('MetaMask not installed');
+      // Mobile: Open MetaMask app via deep link
+      if (isMobile() && !window.ethereum) {
+        connectMetaMaskMobile();
+        return;
+      }
+  
+      // Desktop: Use injected provider
+      if (!window.ethereum) {
+        throw new Error('MetaMask not installed. Please install MetaMask extension.');
+      }
+  
+      const accounts = await window.ethereum.request({
+        method: 'eth_requestAccounts'
+      });
+  
+      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+      
+      if (chainId !== CONFIG.CHAIN_ID_HEX) {
+        try {
+          await window.ethereum.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: CONFIG.CHAIN_ID_HEX }],
+          });
+        } catch (switchError) {
+          if (switchError.code === 4902) {
+            await window.ethereum.request({
+              method: 'wallet_addEthereumChain',
+              params: [{
+                chainId: CONFIG.CHAIN_ID_HEX,
+                chainName: 'Celo Mainnet',
+                nativeCurrency: { name: 'CELO', symbol: 'CELO', decimals: 18 },
+                rpcUrls: [CONFIG.CELO_RPC],
+                blockExplorerUrls: [CONFIG.EXPLORER]
+              }]
+            });
+          } else {
+            throw switchError;
+          }
+        }
+      }
+  
+      setAddress(accounts[0]);
+      setConnected(true);
+      
+      await loadBalances(accounts[0]);
+      await loadProjects();
+      await loadUserStakes(accounts[0]);
+  
+    } catch (err) {
+      console.error(err);
+      if (err.code === 4001) {
+        setError('Connection rejected. Please approve the connection request.');
+      } else {
+        setError(err.message || 'Failed to connect wallet');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
       const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
       const chainId = await window.ethereum.request({ method: 'eth_chainId' });
       if (chainId !== CONFIG.CHAIN_ID_HEX) {
@@ -252,11 +322,11 @@ const ImpactVault = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-green-900 to-gray-900 text-white p-4">
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-8 pt-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8 pt-4">
           <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-br from-green-400 to-emerald-500 p-3 rounded-xl">
-              <Leaf className="w-8 h-8" />
-            </div>
+            <div className="bg-gradient-to-br from-green-400 to-emerald-500 p-2 sm:p-3 rounded-xl">
+              <Leaf className="w-6 h-6 sm:w-8 sm:h-8" />
+              </div>
             <div>
               <h1 className="text-3xl font-bold">ImpactVault</h1>
               <p className="text-green-400 text-sm">Regenerative Finance on Celo</p>
@@ -450,24 +520,66 @@ const ImpactVault = () => {
         </footer>
       </div>
       {showWalletModal && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-800 rounded-2xl border border-green-500/30 max-w-md w-full p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold">Connect Wallet</h3>
-              <button onClick={() => setShowWalletModal(false)} className="text-gray-400 hover:text-white">
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            <button onClick={connectMetaMask} disabled={loading} className="w-full flex items-center gap-4 p-4 bg-gray-700/50 hover:bg-gray-700 rounded-xl transition-all disabled:opacity-50 border border-gray-600 hover:border-green-500">
-              <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center text-2xl">🦊</div>
-              <div className="text-left flex-1">
-                <div className="font-semibold text-lg">MetaMask</div>
-                <div className="text-sm text-gray-400">Connect with MetaMask</div>
-              </div>
-            </button>
+  <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div className="bg-gray-800 rounded-2xl border border-green-500/30 w-full max-w-md p-4 sm:p-6">
+      <div className="flex items-center justify-between mb-4 sm:mb-6">
+        <h3 className="text-xl sm:text-2xl font-bold">Connect Wallet</h3>
+        <button 
+          onClick={() => setShowWalletModal(false)}
+          className="text-gray-400 hover:text-white transition-colors p-2"
+        >
+          <X className="w-5 h-5 sm:w-6 sm:h-6" />
+        </button>
+      </div>
+
+      <div className="space-y-3">
+        {/* MetaMask Option */}
+        <button
+          onClick={connectMetaMask}
+          disabled={loading}
+          className="w-full flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-gray-700/50 hover:bg-gray-700 rounded-xl transition-all disabled:opacity-50 border border-gray-600 hover:border-green-500"
+        >
+          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-orange-500 rounded-xl flex items-center justify-center flex-shrink-0">
+            <svg className="w-6 h-6 sm:w-8 sm:h-8" viewBox="0 0 40 40" fill="white">
+              <path d="M36.4 2L22.2 12.4l2.6-6.2L36.4 2z"/>
+              <path d="M3.6 2l14 10.5-2.5-6.3L3.6 2zM31 29.2l-3.7 5.7 8 2.2 2.3-7.8-6.6-.1zM1.4 29.3l2.3 7.8 8-2.2-3.7-5.7-6.6.1z"/>
+            </svg>
           </div>
-        </div>
-      )}
+          <div className="text-left flex-1">
+            <div className="font-semibold text-base sm:text-lg">MetaMask</div>
+            <div className="text-xs sm:text-sm text-gray-400">
+              {isMobile() ? 'Open MetaMask App' : 'Connect with MetaMask'}
+            </div>
+          </div>
+        </button>
+
+        {/* WalletConnect Option */}
+        <button
+          onClick={() => {
+            setShowWalletModal(false);
+            alert('WalletConnect coming soon! Use MetaMask for now.');
+          }}
+          disabled={loading}
+          className="w-full flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-gray-700/50 hover:bg-gray-700 rounded-xl transition-all disabled:opacity-50 border border-gray-600 hover:border-green-500"
+        >
+          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-500 rounded-xl flex items-center justify-center flex-shrink-0">
+            <svg className="w-6 h-6 sm:w-8 sm:h-8" viewBox="0 0 40 40" fill="white">
+              <path d="M10.5 14.5c5.5-5.4 14.4-5.4 19.9 0l.7.6c.3.3.3.7 0 .9l-2.3 2.3c-.1.1-.4.1-.5 0l-.9-.9c-3.8-3.7-10-3.7-13.9 0l-1 1c-.1.1-.4.1-.5 0l-2.3-2.3c-.3-.2-.3-.6 0-.9l.8-.7zm24.6 4.8l2.1 2c.3.3.3.7 0 .9l-9.3 9.1c-.3.2-.7.2-.9 0l-6.6-6.5c-.1 0-.2-.1-.3 0l-6.6 6.5c-.3.2-.7.2-.9 0l-9.3-9.1c-.3-.2-.3-.6 0-.9l2.1-2c.3-.2.7-.2.9 0l6.6 6.5c.1 0 .2.1.3 0l6.6-6.5c.3-.2.7-.2.9 0l6.6 6.5c.1 0 .2.1.3 0l6.6-6.5c.2-.2.6-.2.9 0z"/>
+            </svg>
+          </div>
+          <div className="text-left flex-1">
+            <div className="font-semibold text-base sm:text-lg">WalletConnect</div>
+            <div className="text-xs sm:text-sm text-gray-400">Scan with mobile wallet</div>
+          </div>
+        </button>
+      </div>
+
+      <p className="text-xs text-gray-500 text-center mt-4">
+        By connecting, you agree to our terms of service
+      </p>
+    </div>
+  </div>
+)}
       {selectedProject && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="bg-gray-800 rounded-2xl border border-green-500/30 max-w-lg w-full p-6">
