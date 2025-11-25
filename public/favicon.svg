@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#10b981;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#059669;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="leafGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#d1fae5;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="50" cy="50" r="48" fill="url(#bgGrad)" />
+  
+  <!-- Leaf layers (growth/impact symbol) -->
+  <path d="M50 20 L67 37 L62 42 L50 30 L38 42 L33 37 Z" fill="url(#leafGrad)" opacity="0.9"/>
+  <path d="M50 35 L64 49 L59 54 L50 45 L41 54 L36 49 Z" fill="url(#leafGrad)" opacity="0.8"/>
+  <path d="M50 50 L61 61 L56 66 L50 60 L44 66 L39 61 Z" fill="url(#leafGrad)" opacity="0.7"/>
+  
+  <!-- Soil/roots (regeneration symbol) -->
+  <path d="M33 67 Q50 77 67 67" stroke="url(#leafGrad)" stroke-width="4" fill="none" stroke-linecap="round"/>
+  
+  <!-- Seed/growth point -->
+  <circle cx="50" cy="80" r="5" fill="#ffffff"/>
+  <circle cx="50" cy="80" r="3" fill="url(#bgGrad)"/>
+</svg>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Leaf, TrendingUp, Globe, Wallet, ArrowUpRight, Check, Zap, Users, DollarSign, AlertCircle, ExternalLink, LogOut } from 'lucide-react';
+import { Leaf, TrendingUp, Globe, Wallet, ArrowUpRight, Check, Zap, Users, DollarSign, AlertCircle, ExternalLink, LogOut, X } from 'lucide-react';
 
 const CONFIG = {
   CONTRACT_ADDRESS: "0x3C35fA01acF439cCD32FfB7D8A738D50b8160348",
@@ -23,19 +23,21 @@ const ImpactVault = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [txHash, setTxHash] = useState('');
+  const [showWalletModal, setShowWalletModal] = useState(false);
 
-  const connectWallet = async () => {
+  const connectMetaMask = async () => {
     setError('');
     setLoading(true);
+    setShowWalletModal(false);
     try {
-      if (!window.ethereum) throw new Error('Please install MetaMask');
+      if (!window.ethereum) throw new Error('MetaMask not installed');
       const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
       const chainId = await window.ethereum.request({ method: 'eth_chainId' });
       if (chainId !== CONFIG.CHAIN_ID_HEX) {
         try {
           await window.ethereum.request({
             method: 'wallet_switchEthereumChain',
-            params: [{ chainId: CONFIG.CHAIN_ID_HEX }],
+            params: [{ chainId: CONFIG.CHAIN_ID_HEX }]
           });
         } catch (switchError) {
           if (switchError.code === 4902) {
@@ -58,10 +60,18 @@ const ImpactVault = () => {
       await loadProjects();
       await loadUserStakes(accounts[0]);
     } catch (err) {
-      setError(err.message || 'Failed to connect wallet');
+      setError(err.code === 4001 ? 'Connection rejected' : err.message || 'Failed to connect');
     } finally {
       setLoading(false);
     }
+  };
+
+  const disconnectWallet = () => {
+    setConnected(false);
+    setAddress('');
+    setBalance({ cUSD: 0, cEUR: 0, CELO: 0 });
+    setUserStakes([]);
+    setError('');
   };
 
   const loadBalances = async (addr) => {
@@ -83,6 +93,8 @@ const ImpactVault = () => {
   };
 
   const loadProjects = async () => {
+    console.log('🔍 Starting to load projects...');
+    console.log('Contract address:', CONFIG.CONTRACT_ADDRESS);
     try {
       const provider = new window.ethers.providers.Web3Provider(window.ethereum);
       const contract = new window.ethers.Contract(CONFIG.CONTRACT_ADDRESS, [
@@ -92,6 +104,7 @@ const ImpactVault = () => {
         'function getProjectImpact(uint256) view returns (string,string,uint256)'
       ], provider);
       const count = await contract.projectCount();
+      console.log('✅ Project count:', count.toNumber());
       const projectsData = [];
       for (let i = 1; i <= count.toNumber(); i++) {
         const basic = await contract.getProject(i);
@@ -250,9 +263,9 @@ const ImpactVault = () => {
             </div>
           </div>
           {!connected ? (
-            <button onClick={connectWallet} disabled={loading} className="bg-gradient-to-r from-green-500 to-emerald-600 px-6 py-3 rounded-xl font-semibold flex items-center gap-2 hover:from-green-600 hover:to-emerald-700 transition-all disabled:opacity-50">
+            <button onClick={() => setShowWalletModal(true)} disabled={loading} className="bg-gradient-to-r from-green-500 to-emerald-600 px-6 py-3 rounded-xl font-semibold flex items-center gap-2 hover:from-green-600 hover:to-emerald-700 transition-all disabled:opacity-50">
               <Wallet className="w-5 h-5" />
-              {loading ? 'Connecting...' : 'Connect Wallet'}
+              Connect Wallet
             </button>
           ) : (
             <div className="flex items-center gap-3">
@@ -260,7 +273,7 @@ const ImpactVault = () => {
                 <div className="text-xs text-gray-400 mb-1">Connected</div>
                 <div className="font-mono text-sm">{address.slice(0, 6)}...{address.slice(-4)}</div>
               </div>
-              <button onClick={() => { setConnected(false); setAddress(''); }} className="bg-gray-800/50 p-3 rounded-xl border border-gray-700 hover:border-red-500/50 transition-all">
+              <button onClick={disconnectWallet} className="bg-gray-800/50 p-3 rounded-xl border border-gray-700 hover:border-red-500/50 transition-all">
                 <LogOut className="w-5 h-5" />
               </button>
             </div>
@@ -302,10 +315,10 @@ const ImpactVault = () => {
               </div>
               <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 backdrop-blur-sm p-6 rounded-2xl border border-purple-500/30">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-gray-400">Staked</span>
+                  <span className="text-gray-400">CELO</span>
                   <TrendingUp className="w-5 h-5 text-purple-400" />
                 </div>
-                <div className="text-3xl font-bold">${totalStaked.toFixed(2)}</div>
+                <div className="text-3xl font-bold">{balance.CELO}</div>
               </div>
               <div className="bg-gradient-to-br from-yellow-500/20 to-orange-500/20 backdrop-blur-sm p-6 rounded-2xl border border-yellow-500/30">
                 <div className="flex items-center justify-between mb-2">
@@ -325,49 +338,56 @@ const ImpactVault = () => {
             </div>
             {activeTab === 'projects' && (
               <div className="grid md:grid-cols-2 gap-6">
-                {projects.filter(p => p.active).map(project => {
-                  const fundedPercent = (project.funded / project.target * 100).toFixed(0);
-                  return (
-                    <div key={project.id} className="bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-700 p-6 hover:border-green-500/50 transition-all">
-                      <div className="flex items-start justify-between mb-4">
-                        <div>
-                          <h3 className="text-xl font-bold mb-1">{project.name}</h3>
-                          <div className="flex items-center gap-3 text-sm text-gray-400">
-                            <span className="flex items-center gap-1"><Globe className="w-4 h-4" />{project.location}</span>
-                            <span className={getRiskColor(project.risk)}>{project.risk} Risk</span>
+                {projects.length === 0 ? (
+                  <div className="col-span-2 bg-gray-800/50 rounded-2xl border border-gray-700 p-12 text-center">
+                    <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-green-400 mx-auto mb-4"></div>
+                    <p className="text-gray-400">Loading projects...</p>
+                  </div>
+                ) : (
+                  projects.filter(p => p.active).map(project => {
+                    const fundedPercent = (project.funded / project.target * 100).toFixed(0);
+                    return (
+                      <div key={project.id} className="bg-gray-800/50 rounded-2xl border border-gray-700 p-6 hover:border-green-500/50 transition-all">
+                        <div className="flex items-start justify-between mb-4">
+                          <div>
+                            <h3 className="text-xl font-bold mb-1">{project.name}</h3>
+                            <div className="flex items-center gap-3 text-sm text-gray-400">
+                              <span className="flex items-center gap-1"><Globe className="w-4 h-4" />{project.location}</span>
+                              <span className={getRiskColor(project.risk)}>{project.risk} Risk</span>
+                            </div>
+                          </div>
+                          <div className="bg-green-500/20 px-3 py-1 rounded-lg">
+                            <div className="text-green-400 font-bold">{project.apy}%</div>
+                            <div className="text-xs text-gray-400">APY</div>
                           </div>
                         </div>
-                        <div className="bg-green-500/20 px-3 py-1 rounded-lg">
-                          <div className="text-green-400 font-bold">{project.apy}%</div>
-                          <div className="text-xs text-gray-400">APY</div>
+                        <p className="text-gray-300 text-sm mb-4">{project.description}</p>
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                          <div className="bg-gray-700/50 p-3 rounded-lg">
+                            <div className="text-xs text-gray-400 mb-1">Impact</div>
+                            <div className="font-semibold text-green-400">{project.impactMetric}</div>
+                          </div>
+                          <div className="bg-gray-700/50 p-3 rounded-lg">
+                            <div className="text-xs text-gray-400 mb-1">Carbon</div>
+                            <div className="font-semibold text-blue-400">{project.carbonCredits} tCO2e</div>
+                          </div>
                         </div>
+                        <div className="mb-4">
+                          <div className="flex justify-between text-sm mb-2">
+                            <span className="text-gray-400">Progress</span>
+                            <span className="text-green-400 font-semibold">{fundedPercent}%</span>
+                          </div>
+                          <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                            <div className="h-full bg-gradient-to-r from-green-500 to-emerald-400" style={{ width: `${Math.min(fundedPercent, 100)}%` }} />
+                          </div>
+                        </div>
+                        <button onClick={() => setSelectedProject(project)} disabled={loading} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 hover:from-green-600 hover:to-emerald-700 transition-all disabled:opacity-50">
+                          Stake {project.currency} <ArrowUpRight className="w-4 h-4" />
+                        </button>
                       </div>
-                      <p className="text-gray-300 text-sm mb-4">{project.description}</p>
-                      <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div className="bg-gray-700/50 p-3 rounded-lg">
-                          <div className="text-xs text-gray-400 mb-1">Impact</div>
-                          <div className="font-semibold text-green-400">{project.impactMetric}</div>
-                        </div>
-                        <div className="bg-gray-700/50 p-3 rounded-lg">
-                          <div className="text-xs text-gray-400 mb-1">Carbon Credits</div>
-                          <div className="font-semibold text-blue-400">{project.carbonCredits} tCO2e</div>
-                        </div>
-                      </div>
-                      <div className="mb-4">
-                        <div className="flex justify-between text-sm mb-2">
-                          <span className="text-gray-400">Progress</span>
-                          <span className="text-green-400 font-semibold">{fundedPercent}%</span>
-                        </div>
-                        <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                          <div className="h-full bg-gradient-to-r from-green-500 to-emerald-400" style={{ width: `${Math.min(fundedPercent, 100)}%` }} />
-                        </div>
-                      </div>
-                      <button onClick={() => setSelectedProject(project)} disabled={loading} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 hover:from-green-600 hover:to-emerald-700 transition-all disabled:opacity-50">
-                        Stake {project.currency} <ArrowUpRight className="w-4 h-4" />
-                      </button>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
             )}
             {activeTab === 'portfolio' && (
@@ -391,11 +411,11 @@ const ImpactVault = () => {
                       <div className="grid grid-cols-2 gap-4 mb-4">
                         <div className="bg-gray-700/50 rounded-xl p-4">
                           <div className="text-gray-400 text-sm mb-1">Pending</div>
-                          <div className="text-2xl font-bold text-yellow-400">+{stake.pendingRewards.toFixed(4)} {stake.currency}</div>
+                          <div className="text-2xl font-bold text-yellow-400">+{stake.pendingRewards.toFixed(4)}</div>
                         </div>
                         <div className="bg-gray-700/50 rounded-xl p-4">
                           <div className="text-gray-400 text-sm mb-1">Claimed</div>
-                          <div className="text-2xl font-bold text-green-400">{stake.totalClaimed.toFixed(4)} {stake.currency}</div>
+                          <div className="text-2xl font-bold text-green-400">{stake.totalClaimed.toFixed(4)}</div>
                         </div>
                       </div>
                       <div className="flex gap-3">
@@ -419,26 +439,54 @@ const ImpactVault = () => {
             <p className="text-gray-400 text-lg">Start investing in verified impact projects</p>
           </div>
         )}
+        <footer className="mt-16 pt-8 border-t border-gray-700">
+          <div className="flex items-center justify-center gap-6 text-gray-400 text-sm">
+            <span>Created by</span>
+            <a href="https://warpcast.com/Bamzzz" target="_blank" rel="noopener noreferrer" className="hover:text-purple-400">@Bamzzz</a>
+            <span>•</span>
+            <a href="https://twitter.com/hrh_mckay" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400">@hrh_mckay</a>
+          </div>
+          <div className="text-center mt-4 text-gray-500 text-sm">Built with ❤️ on Celo</div>
+        </footer>
       </div>
+      {showWalletModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-gray-800 rounded-2xl border border-green-500/30 max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-2xl font-bold">Connect Wallet</h3>
+              <button onClick={() => setShowWalletModal(false)} className="text-gray-400 hover:text-white">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <button onClick={connectMetaMask} disabled={loading} className="w-full flex items-center gap-4 p-4 bg-gray-700/50 hover:bg-gray-700 rounded-xl transition-all disabled:opacity-50 border border-gray-600 hover:border-green-500">
+              <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center text-2xl">🦊</div>
+              <div className="text-left flex-1">
+                <div className="font-semibold text-lg">MetaMask</div>
+                <div className="text-sm text-gray-400">Connect with MetaMask</div>
+              </div>
+            </button>
+          </div>
+        </div>
+      )}
       {selectedProject && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="bg-gray-800 rounded-2xl border border-green-500/30 max-w-lg w-full p-6">
             <h3 className="text-2xl font-bold mb-4">Stake in {selectedProject.name}</h3>
             <div className="bg-gray-700/50 rounded-xl p-4 mb-6">
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <div className="text-gray-400 mb-1">APY</div>
+                  <div className="text-gray-400 text-sm mb-1">APY</div>
                   <div className="text-xl font-bold text-green-400">{selectedProject.apy}%</div>
                 </div>
                 <div>
-                  <div className="text-gray-400 mb-1">Risk</div>
+                  <div className="text-gray-400 text-sm mb-1">Risk</div>
                   <div className={`text-xl font-bold ${getRiskColor(selectedProject.risk)}`}>{selectedProject.risk}</div>
                 </div>
               </div>
             </div>
             <div className="mb-6">
               <label className="block text-gray-400 text-sm mb-2">Amount ({selectedProject.currency})</label>
-              <input type="number" value={stakeAmount} onChange={(e) => setStakeAmount(e.target.value)} placeholder="0.00" step="0.01" min="0" className="w-full bg-gray-700 border border-gray-600 rounded-xl px-4 py-3 text-xl font-semibold focus:border-green-500 focus:outline-none" />
+              <input type="number" value={stakeAmount} onChange={(e) => setStakeAmount(e.target.value)} placeholder="0.00" className="w-full bg-gray-700 border border-gray-600 rounded-xl px-4 py-3 text-xl font-semibold focus:border-green-500 focus:outline-none" />
               <div className="text-xs text-gray-400 mt-2">
                 Available: {selectedProject.currency === 'cUSD' ? balance.cUSD : balance.cEUR} {selectedProject.currency}
               </div>
