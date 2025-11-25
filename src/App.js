@@ -298,7 +298,7 @@ const ImpactVault = () => {
         )}
         {connected ? (
           <>
-            <div className="grid md:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8">
               <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 backdrop-blur-sm p-6 rounded-2xl border border-green-500/30">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-gray-400">cUSD</span>

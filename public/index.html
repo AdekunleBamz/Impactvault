@@ -2,16 +2,16 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <meta name="theme-color" content="#10b981" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="description" content="ImpactVault - Regenerative Finance on Celo. Stake stablecoins in verified climate projects and earn sustainable yields." />
-    <meta property="og:title" content="ImpactVault - ReFi on Celo" />
-    <meta property="og:description" content="Stake cUSD/cEUR in verified climate projects. Fund reforestation, renewable energy, and ocean cleanup while earning yields." />
-    <meta property="og:type" content="website" />
     
     <title>ImpactVault - ReFi on Celo</title>
     
-    <!-- Favicon SVG -->
+    <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='grad' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' style='stop-color:%2310b981;stop-opacity:1' /><stop offset='100%' style='stop-color:%23059669;stop-opacity:1' /></linearGradient></defs><circle cx='50' cy='50' r='45' fill='url(%23grad)'/><path d='M50 20 L65 35 L60 40 L50 30 L40 40 L35 35 Z' fill='white'/><path d='M50 35 L62 47 L57 52 L50 45 L43 52 L38 47 Z' fill='white'/><path d='M50 50 L59 59 L54 64 L50 60 L46 64 L41 59 Z' fill='white'/><path d='M35 65 Q50 75 65 65' stroke='white' stroke-width='3' fill='none'/><circle cx='50' cy='78' r='4' fill='white'/></svg>" />
     
     <!-- Tailwind CSS -->
@@ -20,8 +20,32 @@
     <!-- Ethers.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
     
-    <!-- WalletConnect -->
-    <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
+    <!-- Mobile-specific styles -->
+    <style>
+      * {
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+      }
+      
+      body {
+        overscroll-behavior: none;
+        -webkit-overflow-scrolling: touch;
+      }
+      
+      input, button, select {
+        font-size: 16px !important; /* Prevents zoom on iOS */
+      }
+      
+      /* Fix for mobile Safari */
+      input:focus {
+        font-size: 16px !important;
+      }
+      
+      /* Smooth scrolling */
+      html {
+        scroll-behavior: smooth;
+      }
+    </style>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
